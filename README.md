@@ -1,6 +1,6 @@
 # Funsol FCM
 
-[![](https://jitpack.io/v/Funsol-Projects/Funsol-FCM.svg)](https://jitpack.io/#Funsol-Projects/Funsol-FCM)
+[![](https://jitpack.io/v/Funsol-Projects/FunsolTech-FCM.svg)](https://jitpack.io/#Funsol-Projects/FunsolTech-FCM)
 
 FunsolFCM is a Firebase Cloud Messaging Android app that demonstrates registering your Android app
 for notifications and handling the receipt of a message. InstanceID allows easy registration while
@@ -51,7 +51,7 @@ Add FunsolFCM dependencies in App level build.gradle.
 
 ```
     dependencies {
-        implementation 'com.github.Funsol-Projects:Funsol-FCM:3.0.0'
+        implementation 'com.github.Funsol-Projects:FunsolTech-FCM:1.0.0'
     }
 ```  
 
@@ -60,7 +60,7 @@ Add FunsolFCM dependencies in App level build.gradle.
 Finally intialize Firebase and setup FCM in application class or in your "MainActivity"
 
 ```
-    FunsolFCM.setupFCM(this, "YourTopicName")
+    FunsolFCM.setup(this, "YourTopicName")
 ```
 
 ### Remove

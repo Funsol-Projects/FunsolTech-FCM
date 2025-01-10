@@ -54,13 +54,13 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
                 groupId = 'com.github.Funsol-Projects'
-                artifactId = 'Funsol-FCM'
+                artifactId = 'FunsolTech-FCM'
                 version = '1.0.0'
             }
             debug(MavenPublication) {
                 from components.debug
                 groupId = 'com.github.Funsol-Projects'
-                artifactId = 'Funsol-FCM'
+                artifactId = 'FunsolTech-FCM'
                 version = '1.0.0'
             }
         }
