@@ -51,7 +51,7 @@ Add FunsolFCM dependencies in App level build.gradle.
 
 ```
     dependencies {
-        implementation 'com.github.Funsol-Projects:FunsolTech-FCM:1.0.0'
+        implementation 'com.github.Funsol-Projects:FunsolTech-FCM:1.0.1'
     }
 ```  
 
