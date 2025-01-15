@@ -55,15 +55,13 @@ class FunsolFirebaseMessagingService : FirebaseMessagingService() {
         val shortDesc = data["short_desc"] ?: return
         val image = data["feature"]
         val longDesc = data["long_desc"]
-        val packageName = data["package"]
+        val packageName = data["package"] ?: return
         val crossPromotion = data["crossPromotion"]?.toBoolean() ?: false
 
-        if (!packageName.isNullOrEmpty()) {
-            Handler(mainLooper).post {
-                FcmNotificationHandler(this).sendNotification(
-                    icon, title, shortDesc, image, longDesc, packageName, crossPromotion
-                )
-            }
+        if (packageName.isNotEmpty()) {
+            FcmNotificationHandler(this).sendNotification(
+                icon, title, shortDesc, image, longDesc, packageName, crossPromotion
+            )
         }
     }
 }

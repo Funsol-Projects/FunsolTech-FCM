@@ -7,6 +7,10 @@ import android.os.Build
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -33,10 +37,18 @@ class FunsolFCM : FcmManager {
      * @param topic The topic to which the app will subscribe for receiving FCM messages.
      */
     override fun setup(context: Context, topic: String) {
-        runBlocking {
+        val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+            Log.e(TAG, "Unhandled exception in coroutine: ${exception.message}", exception)
+        }
+
+        CoroutineScope(Dispatchers.IO + exceptionHandler).launch {
             initializeFirebase(context)
             createNotificationChannel(context)
-            FirebaseMessaging.getInstance().subscribeToTopic(topic)
+            try {
+                FirebaseMessaging.getInstance().subscribeToTopic(topic)
+            } catch (e: Exception) {
+                Log.e(TAG, "Firebase subscribe topic failed: ${e.message}", e)
+            }
         }
     }
 

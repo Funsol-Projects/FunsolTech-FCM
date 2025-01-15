@@ -12,30 +12,33 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.squareup.picasso.Picasso
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
+
 /**
- * Handles the creation and display of Firebase Cloud Messaging (FCM) notifications.
+ * Handles sending notifications related to Firebase Cloud Messaging (FCM) for the app.
+ * This includes handling notifications for cross-promotion and simple notifications.
  *
- * This class is responsible for building and displaying notifications based on FCM message data.
- * It also handles image loading for notification views and manages intents for app-related actions.
- *
- * @param context The [Context] used for accessing system services and resources.
+ * @property context The context of the application.
  */
 class FcmNotificationHandler(private val context: Context) {
 
     private val TAG = "FcmNotificationHandler"
 
     /**
-     * Handles the display of notifications for both cross-promotion and simple notifications.
+     * Sends a notification based on the provided details.
      *
-     * @param icon The URL of the notification's icon.
+     * @param icon The URL of the icon image for the notification.
      * @param title The title of the notification.
-     * @param shortDesc The short description or body of the notification.
-     * @param image The URL of the notification's large image, if any.
-     * @param longDesc The long description of the notification, if applicable.
-     * @param storePackage The package name of the app to be promoted or opened.
-     * @param crossPromotion A flag indicating if this is a cross-promotion notification.
+     * @param shortDesc A short description for the notification.
+     * @param image The URL of the image for the notification (optional).
+     * @param longDesc A long description for the notification (optional).
+     * @param storePackage The package name of the app to open on notification click.
+     * @param crossPromotion Whether the notification is part of a cross-promotion campaign.
      */
     fun sendNotification(
         icon: String,
@@ -50,89 +53,227 @@ class FcmNotificationHandler(private val context: Context) {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Intent for the notification action
+        // Determine the intent based on whether the app is installed or not
         val intent = if (!isAppInstalled(storePackage)) {
-            createPlayStoreIntent(storePackage) // Opens Play Store if app is not installed
+            createPlayStoreIntent(storePackage)
         } else {
-            createOpenAppIntent(storePackage) // Opens the app if installed
+            createOpenAppIntent(storePackage)
         }
 
-        // PendingIntent for the notification
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+            AtomicInteger().incrementAndGet(), // Unique request code for each notification
+            intent.apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val notificationID = System.currentTimeMillis().toInt() // Timestamp-based ID
+
         if (crossPromotion) {
-            // Cross-promotion notification flow
-            val remoteViews = RemoteViews(context.packageName, R.layout.firebase_notification_view).apply {
+            sendCrossPromotionNotification(
+                title,
+                shortDesc,
+                icon,
+                image,
+                pendingIntent,
+                channelId,
+                notificationManager,
+                notificationID
+            )
+        } else {
+            sendSimpleNotification(
+                title,
+                shortDesc,
+                icon,
+                image,
+                pendingIntent,
+                channelId,
+                notificationManager,
+                notificationID
+            )
+        }
+    }
+
+    /**
+     * Sends a cross-promotion notification.
+     *
+     * @param title The title of the notification.
+     * @param shortDesc The short description of the notification.
+     * @param icon The URL of the icon image.
+     * @param image The URL of the image for the notification.
+     * @param pendingIntent The intent to launch on clicking the notification.
+     * @param channelId The ID of the notification channel.
+     * @param notificationManager The system notification manager.
+     * @param notificationID The unique ID for the notification.
+     */
+    private fun sendCrossPromotionNotification(
+        title: String,
+        shortDesc: String,
+        icon: String,
+        image: String?,
+        pendingIntent: PendingIntent,
+        channelId: String,
+        notificationManager: NotificationManager,
+        notificationID: Int
+    ) {
+        val remoteViews =
+            RemoteViews(context.packageName, R.layout.firebase_notification_view).apply {
                 setTextViewText(R.id.tv_title, title)
                 setTextViewText(R.id.tv_short_desc, shortDesc)
             }
 
-            val notificationBuilder = NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(R.drawable.notification_icon)
-                .setContentIntent(pendingIntent)
-                .setCustomContentView(remoteViews)
-                .setCustomBigContentView(remoteViews)
-                .setAutoCancel(true)
+        val notificationBuilder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.notification_icon)
+            .setContentIntent(pendingIntent)
+            .setCustomContentView(remoteViews)
+            .setCustomBigContentView(remoteViews)
+            .setAutoCancel(true)
 
-            val notificationID = AtomicInteger().incrementAndGet()
-            notificationManager.notify(notificationID, notificationBuilder.build())
+        notificationManager.notify(notificationID, notificationBuilder.build())
+        loadImagesIntoViews(
+            icon,
+            image,
+            remoteViews,
+            notificationID,
+            notificationBuilder,
+            notificationManager
+        )
+    }
 
-            // Load images asynchronously
-            loadImagesIntoViews(icon, image, remoteViews, notificationID, notificationBuilder)
+    /**
+     * Sends a simple notification with the provided details.
+     *
+     * @param title The title of the notification.
+     * @param shortDesc The short description of the notification.
+     * @param icon The URL of the icon image.
+     * @param image The URL of the image for the notification (optional).
+     * @param pendingIntent The intent to launch on clicking the notification.
+     * @param channelId The ID of the notification channel.
+     * @param notificationManager The system notification manager.
+     * @param notificationID The unique ID for the notification.
+     */
+    private fun sendSimpleNotification(
+        title: String,
+        shortDesc: String,
+        icon: String,
+        image: String?,
+        pendingIntent: PendingIntent,
+        channelId: String,
+        notificationManager: NotificationManager,
+        notificationID: Int
+    ) {
+        val notificationBuilder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.notification_icon)
+            .setContentIntent(pendingIntent)
+            .setContentTitle(title)
+            .setContentText(shortDesc)
+            .setAutoCancel(true)
+
+        if (!image.isNullOrEmpty()) {
+            Picasso.get().load(image).into(object : com.squareup.picasso.Target {
+                override fun onBitmapLoaded(
+                    bitmap: android.graphics.Bitmap?,
+                    from: Picasso.LoadedFrom?
+                ) {
+                    val style = NotificationCompat.BigPictureStyle().bigPicture(bitmap)
+                    notificationBuilder.setStyle(style)
+
+                    notificationManager.notify(notificationID, notificationBuilder.build())
+                }
+
+                override fun onBitmapFailed(
+                    e: Exception?,
+                    errorDrawable: android.graphics.drawable.Drawable?
+                ) {
+                    Log.e(TAG, "Failed to load image: ${e?.message}")
+                    notificationManager.notify(notificationID, notificationBuilder.build())
+                }
+
+                override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
+            })
         } else {
-            // Simple notification flow
-            val notificationBuilder = NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(R.drawable.notification_icon)
-                .setContentIntent(pendingIntent)
-                .setContentTitle(title)
-                .setContentText(shortDesc)
-                .setAutoCancel(true)
+            notificationManager.notify(notificationID, notificationBuilder.build())
+        }
+    }
 
-            // If an image URL is provided, use it for BigPictureStyle
-            if (!image.isNullOrEmpty()) {
-                Picasso.get().load(image).into(object : com.squareup.picasso.Target {
-                    override fun onBitmapLoaded(bitmap: android.graphics.Bitmap?, from: Picasso.LoadedFrom?) {
-                        val style = NotificationCompat.BigPictureStyle()
-                            .bigPicture(bitmap)
+    /**
+     * Loads images asynchronously into notification views.
+     *
+     * @param icon The URL of the icon image.
+     * @param image The URL of the image for the notification.
+     * @param remoteViews The RemoteViews object for the notification.
+     * @param notificationID The unique ID for the notification.
+     * @param notificationBuilder The notification builder.
+     * @param notificationManager The system notification manager.
+     */
+    private fun loadImagesIntoViews(
+        icon: String,
+        image: String?,
+        remoteViews: RemoteViews,
+        notificationID: Int,
+        notificationBuilder: NotificationCompat.Builder,
+        notificationManager: NotificationManager
+    ) {
+        val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+            Log.e(TAG, "Unhandled exception in coroutine: ${exception.message}", exception)
+        }
 
-                        // Load the large icon asynchronously
-                        Picasso.get().load(icon).into(object : com.squareup.picasso.Target {
-                            override fun onBitmapLoaded(largeIcon: android.graphics.Bitmap?, from: Picasso.LoadedFrom?) {
-                                style.bigLargeIcon(largeIcon)
-                                notificationBuilder.setStyle(style)
+        CoroutineScope(Dispatchers.Main + exceptionHandler).launch {
+            // Load icon asynchronously
+            Picasso.get().load(icon).into(object : com.squareup.picasso.Target {
+                override fun onBitmapLoaded(
+                    largeIcon: android.graphics.Bitmap?,
+                    from: Picasso.LoadedFrom?
+                ) {
+                    remoteViews.setImageViewBitmap(R.id.iv_icon, largeIcon)
 
-                                // Show the notification after both images are loaded
-                                val notificationID = AtomicInteger().incrementAndGet()
-                                notificationManager.notify(notificationID, notificationBuilder.build())
+                    // Load big image if available
+                    if (!image.isNullOrEmpty()) {
+                        Picasso.get().load(image).into(object : com.squareup.picasso.Target {
+                            override fun onBitmapLoaded(
+                                bigImage: android.graphics.Bitmap?,
+                                from: Picasso.LoadedFrom?
+                            ) {
+                                remoteViews.setViewVisibility(R.id.iv_feature, View.VISIBLE)
+                                remoteViews.setImageViewBitmap(R.id.iv_feature, bigImage)
+                                notificationManager.notify(
+                                    notificationID,
+                                    notificationBuilder.build()
+                                )
                             }
 
-                            override fun onBitmapFailed(e: Exception?, errorDrawable: android.graphics.drawable.Drawable?) {
-                                Log.e(TAG, "Failed to load large icon: ${e?.message}")
+                            override fun onBitmapFailed(
+                                e: Exception?,
+                                errorDrawable: android.graphics.drawable.Drawable?
+                            ) {
+                                Log.e(TAG, "Failed to load big image: ${e?.message}")
+                                notificationManager.notify(
+                                    notificationID,
+                                    notificationBuilder.build()
+                                )
                             }
 
                             override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
                         })
+                    } else {
+                        notificationManager.notify(notificationID, notificationBuilder.build())
                     }
+                }
 
-                    override fun onBitmapFailed(e: Exception?, errorDrawable: android.graphics.drawable.Drawable?) {
-                        Log.e(TAG, "Failed to load big picture: ${e?.message}")
-                    }
+                override fun onBitmapFailed(
+                    e: Exception?,
+                    errorDrawable: android.graphics.drawable.Drawable?
+                ) {
+                    Log.e(TAG, "Failed to load icon: ${e?.message}")
+                    notificationManager.notify(notificationID, notificationBuilder.build())
+                }
 
-                    override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
-                })
-            } else {
-                // Show notification without images
-                val notificationID = AtomicInteger().incrementAndGet()
-                notificationManager.notify(notificationID, notificationBuilder.build())
-            }
+                override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
+            })
         }
     }
-
 
     /**
      * Checks if the specified app is installed on the device.
@@ -170,34 +311,10 @@ class FcmNotificationHandler(private val context: Context) {
         return try {
             Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
         } catch (e: ActivityNotFoundException) {
-            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
-        }
-    }
-
-    /**
-     * Loads images into the notification views using Picasso.
-     *
-     * @param icon URL of the notification icon.
-     * @param image Optional URL of the feature image.
-     * @param remoteViews The [RemoteViews] to update with images.
-     * @param notificationID The ID of the notification.
-     * @param notificationBuilder The [NotificationCompat.Builder] used to build the notification.
-     */
-    private fun loadImagesIntoViews(
-        icon: String,
-        image: String?,
-        remoteViews: RemoteViews,
-        notificationID: Int,
-        notificationBuilder: NotificationCompat.Builder
-    ) {
-        try {
-            Picasso.get().load(icon).into(remoteViews, R.id.iv_icon, notificationID, notificationBuilder.build())
-            if (!image.isNullOrEmpty()) {
-                remoteViews.setViewVisibility(R.id.iv_feature, View.VISIBLE)
-                Picasso.get().load(image).into(remoteViews, R.id.iv_feature, notificationID, notificationBuilder.build())
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading images into notification views: ${e.message}")
+            Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
+            )
         }
     }
 }
