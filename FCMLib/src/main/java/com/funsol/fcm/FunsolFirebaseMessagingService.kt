@@ -59,9 +59,11 @@ class FunsolFirebaseMessagingService : FirebaseMessagingService() {
         val crossPromotion = data["crossPromotion"]?.toBoolean() ?: false
 
         if (packageName.isNotEmpty()) {
-            FcmNotificationHandler(this).sendNotification(
-                icon, title, shortDesc, image, longDesc, packageName, crossPromotion
-            )
+//            Handler(mainLooper).post {
+                FcmNotificationHandler(this).sendNotification(
+                    icon, title, shortDesc, image, longDesc, packageName, crossPromotion
+                )
+//            }
         }
     }
 }

@@ -5,14 +5,14 @@ plugins {
 }
 
 android {
+    namespace 'com.funsol.fcm'
     compileSdk 35
 
-    namespace 'com.funsol.fcm'
 
 
     defaultConfig {
         minSdk 23
-        targetSdkVersion 35
+        targetSdkVersion 34
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
@@ -38,8 +38,7 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
-    implementation platform('com.google.firebase:firebase-bom:33.7.0')
-    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-messaging:24.1.0'
 
     implementation 'com.squareup.picasso:picasso:2.71828'
 
@@ -55,13 +54,13 @@ afterEvaluate {
                 from components.release
                 groupId = 'com.github.Funsol-Projects'
                 artifactId = 'FunsolTech-FCM'
-                version = 'v1.0.3'
+                version = 'v1.0.4'
             }
             debug(MavenPublication) {
                 from components.debug
                 groupId = 'com.github.Funsol-Projects'
                 artifactId = 'FunsolTech-FCM'
-                version = 'v1.0.3'
+                version = 'v1.0.4'
             }
         }
     }

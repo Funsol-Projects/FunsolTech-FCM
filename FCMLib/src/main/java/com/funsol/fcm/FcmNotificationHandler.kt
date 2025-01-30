@@ -73,25 +73,11 @@ class FcmNotificationHandler(private val context: Context) {
 
         if (crossPromotion) {
             sendCrossPromotionNotification(
-                title,
-                shortDesc,
-                icon,
-                image,
-                pendingIntent,
-                channelId,
-                notificationManager,
-                notificationID
+                title, shortDesc, icon, image, pendingIntent, channelId, notificationManager, notificationID
             )
         } else {
             sendSimpleNotification(
-                title,
-                shortDesc,
-                icon,
-                image,
-                pendingIntent,
-                channelId,
-                notificationManager,
-                notificationID
+                title, shortDesc, icon, image, pendingIntent, channelId, notificationManager, notificationID
             )
         }
     }
@@ -118,11 +104,10 @@ class FcmNotificationHandler(private val context: Context) {
         notificationManager: NotificationManager,
         notificationID: Int
     ) {
-        val remoteViews =
-            RemoteViews(context.packageName, R.layout.firebase_notification_view).apply {
-                setTextViewText(R.id.tv_title, title)
-                setTextViewText(R.id.tv_short_desc, shortDesc)
-            }
+        val remoteViews = RemoteViews(context.packageName, R.layout.firebase_notification_view).apply {
+            setTextViewText(R.id.tv_title, title)
+            setTextViewText(R.id.tv_short_desc, shortDesc)
+        }
 
         val notificationBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.notification_icon)
@@ -132,14 +117,7 @@ class FcmNotificationHandler(private val context: Context) {
             .setAutoCancel(true)
 
         notificationManager.notify(notificationID, notificationBuilder.build())
-        loadImagesIntoViews(
-            icon,
-            image,
-            remoteViews,
-            notificationID,
-            notificationBuilder,
-            notificationManager
-        )
+        loadImagesIntoViews(icon, image, remoteViews, notificationID, notificationBuilder, notificationManager)
     }
 
     /**
@@ -171,30 +149,33 @@ class FcmNotificationHandler(private val context: Context) {
             .setContentText(shortDesc)
             .setAutoCancel(true)
 
-        if (!image.isNullOrEmpty()) {
-            Picasso.get().load(image).into(object : com.squareup.picasso.Target {
-                override fun onBitmapLoaded(
-                    bitmap: android.graphics.Bitmap?,
-                    from: Picasso.LoadedFrom?
-                ) {
-                    val style = NotificationCompat.BigPictureStyle().bigPicture(bitmap)
-                    notificationBuilder.setStyle(style)
+        val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+            Log.e(TAG, "Unhandled exception in coroutine: ${exception.message}", exception)
+        }
 
-                    notificationManager.notify(notificationID, notificationBuilder.build())
-                }
+        CoroutineScope(Dispatchers.Main + exceptionHandler).launch {
+            // Load icon asynchronously
+            if (!image.isNullOrEmpty()) {
 
-                override fun onBitmapFailed(
-                    e: Exception?,
-                    errorDrawable: android.graphics.drawable.Drawable?
-                ) {
-                    Log.e(TAG, "Failed to load image: ${e?.message}")
-                    notificationManager.notify(notificationID, notificationBuilder.build())
-                }
+                Picasso.get().load(image).into(object : com.squareup.picasso.Target {
+                    override fun onBitmapLoaded(bitmap: android.graphics.Bitmap?, from: Picasso.LoadedFrom?) {
+                        val style = NotificationCompat.BigPictureStyle().bigPicture(bitmap)
+                        notificationBuilder.setStyle(style)
 
-                override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
-            })
-        } else {
-            notificationManager.notify(notificationID, notificationBuilder.build())
+                        notificationManager.notify(notificationID, notificationBuilder.build())
+                    }
+
+                    override fun onBitmapFailed(e: Exception?, errorDrawable: android.graphics.drawable.Drawable?) {
+                        Log.e(TAG, "Failed to load image: ${e?.message}")
+                        notificationManager.notify(notificationID, notificationBuilder.build())
+                    }
+
+                    override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
+                })
+
+            } else {
+                notificationManager.notify(notificationID, notificationBuilder.build())
+            }
         }
     }
 
@@ -223,36 +204,21 @@ class FcmNotificationHandler(private val context: Context) {
         CoroutineScope(Dispatchers.Main + exceptionHandler).launch {
             // Load icon asynchronously
             Picasso.get().load(icon).into(object : com.squareup.picasso.Target {
-                override fun onBitmapLoaded(
-                    largeIcon: android.graphics.Bitmap?,
-                    from: Picasso.LoadedFrom?
-                ) {
+                override fun onBitmapLoaded(largeIcon: android.graphics.Bitmap?, from: Picasso.LoadedFrom?) {
                     remoteViews.setImageViewBitmap(R.id.iv_icon, largeIcon)
 
                     // Load big image if available
                     if (!image.isNullOrEmpty()) {
                         Picasso.get().load(image).into(object : com.squareup.picasso.Target {
-                            override fun onBitmapLoaded(
-                                bigImage: android.graphics.Bitmap?,
-                                from: Picasso.LoadedFrom?
-                            ) {
+                            override fun onBitmapLoaded(bigImage: android.graphics.Bitmap?, from: Picasso.LoadedFrom?) {
                                 remoteViews.setViewVisibility(R.id.iv_feature, View.VISIBLE)
                                 remoteViews.setImageViewBitmap(R.id.iv_feature, bigImage)
-                                notificationManager.notify(
-                                    notificationID,
-                                    notificationBuilder.build()
-                                )
+                                notificationManager.notify(notificationID, notificationBuilder.build())
                             }
 
-                            override fun onBitmapFailed(
-                                e: Exception?,
-                                errorDrawable: android.graphics.drawable.Drawable?
-                            ) {
+                            override fun onBitmapFailed(e: Exception?, errorDrawable: android.graphics.drawable.Drawable?) {
                                 Log.e(TAG, "Failed to load big image: ${e?.message}")
-                                notificationManager.notify(
-                                    notificationID,
-                                    notificationBuilder.build()
-                                )
+                                notificationManager.notify(notificationID, notificationBuilder.build())
                             }
 
                             override fun onPrepareLoad(placeHolderDrawable: android.graphics.drawable.Drawable?) {}
@@ -262,10 +228,7 @@ class FcmNotificationHandler(private val context: Context) {
                     }
                 }
 
-                override fun onBitmapFailed(
-                    e: Exception?,
-                    errorDrawable: android.graphics.drawable.Drawable?
-                ) {
+                override fun onBitmapFailed(e: Exception?, errorDrawable: android.graphics.drawable.Drawable?) {
                     Log.e(TAG, "Failed to load icon: ${e?.message}")
                     notificationManager.notify(notificationID, notificationBuilder.build())
                 }
@@ -311,10 +274,7 @@ class FcmNotificationHandler(private val context: Context) {
         return try {
             Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
         } catch (e: ActivityNotFoundException) {
-            Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
-            )
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
         }
     }
 }

@@ -51,7 +51,7 @@ Add FunsolFCM dependencies in App level build.gradle.
 
 ```
     dependencies {
-        implementation 'com.github.Funsol-Projects:FunsolTech-FCM:v1.0.3'
+        implementation 'com.github.Funsol-Projects:FunsolTech-FCM:v1.0.4'
     }
 ```  
 
@@ -60,7 +60,7 @@ Add FunsolFCM dependencies in App level build.gradle.
 Finally intialize Firebase and setup FCM in application class or in your "MainActivity"
 
 ```
-    FunsolFCM.setup(this, "YourTopicName")
+    FunsolFCM().setup(this, "YourTopicName")
 ```
 
 ### Remove
@@ -68,7 +68,7 @@ Finally intialize Firebase and setup FCM in application class or in your "MainAc
 If you want to stop receiving notification from the subscribed topic simply call.
 
 ```
-    FunsolFCM.removeSubscription("YourTopicName")
+    FunsolFCM().removeSubscription("YourTopicName")
 ```
 
 ## License

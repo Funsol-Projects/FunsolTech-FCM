@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId "com.pandalibs.pandafcm"
         minSdk 23
-        targetSdkVersion 35
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
 
@@ -41,8 +41,7 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
 
-    implementation platform('com.google.firebase:firebase-bom:33.7.0')
-    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-messaging:24.1.0'
 
     implementation 'com.squareup.picasso:picasso:2.71828'
 
